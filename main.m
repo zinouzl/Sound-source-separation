@@ -1,7 +1,10 @@
 clear all; close all;
 
-[x fs] = audioread('lead_vocal.wav');
-[y,fss] = audioread('sunrise-Mix_Bal_Pan.wav');
+% train audio
+[x fs] = audioread('data/lead_vocal.wav');
+
+% test audio
+[y,fss] = audioread('data/sunrise-Mix_Bal_Pan.wav');
 Lx = [];
 
 x1 = (x(:,1)+x(:,2))/2;
@@ -12,7 +15,7 @@ nlap = wlen/2;      % 50% de wlen
 nfft = 1024;
 
 
-% %% TFCT prof
+% %% TFCT 
  h = 50;
 ma = 1;
 k=20*fs;
@@ -27,15 +30,18 @@ k=k+(20*fs);
 % tfctr =[tfctr,tfct] ;
 [tfct1, f, t] = stft(y2, wlen, h, nfft, fs);
 
+
+% using GPU Array to accelerate training
+
  V =gpuArray(tfct);
  T = gpuArray(tfct1);
 
  V = abs(V);
  T = abs(T);
-%% Calcul des paramètres : 
-S = 10;                   % Nombres de bases
+%% Calculate parameters : 
+S = 10;                   % Number of bases
 [K N] = size(tfct);
-W0 = rand(K,S,'gpuArray')+1;         % Dictionnaire
+W0 = rand(K,S,'gpuArray')+1;         % Dictionary
 H0 = rand(S,N,'gpuArray')+1;         % Activation
 
 %bases = 1:S;
@@ -56,7 +62,7 @@ for i = 1:100
 % update dictionaries
     F = F .* ((V./(F*H+eps))*H') ./(O*H');
    % err(i) = norm(F*H - V);
-    
+  % uncomment to plot  
 %     subplot(4, 4, [6,7,8,10,11,12,14,15,16]);
 %     imagesc(t,f,20*log10(V));
 %     colorbar
@@ -74,7 +80,8 @@ for i = 1:100
 %     axis xy;
 
     %pause();
-    
+
+    % uncomment to see the number of iteration
    % disp(['iteration : ' num2str(i)]);
 end
 %figure()
@@ -108,16 +115,21 @@ for i=1:300
 end
 %figure()
 %plot(err1)
+
 disp('finishing factoriz')
+
 lamda = angle(tfct);
 sound = F * G ;
 sound = sound.*exp(1i*lamda);
 disp('start gathering');
 sound1 = gather(sound);
+
 disp('finishing')
 [X, t] = itfct(sound1, h, nfft, fs);
 X =  medfilt1(X);
 %X = Wiener(X,fs);
 Lx=[Lx X];
 end
+
+% write the audio generated
 audiowrite('test.wav',Lx,fs);
